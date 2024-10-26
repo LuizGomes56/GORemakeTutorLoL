@@ -1,13 +1,13 @@
 package structs
 
 type ExtendsActivePlayer struct {
-	ChampionName string `json:"championName"`
-	// Champion
-	BaseStats  GameCoreStats `json:"baseStats"`
-	BonusStats GameCoreStats `json:"bonusStats"`
-	Team       string        `json:"team"`
-	Tool       string        `json:"tool"`
-	Relevant   GameRelevant  `json:"relevant"`
+	ChampionName string         `json:"championName"`
+	Champion     TargetChampion `json:"champion"`
+	BaseStats    GameCoreStats  `json:"baseStats"`
+	BonusStats   GameCoreStats  `json:"bonusStats"`
+	Team         string         `json:"team"`
+	Tool         string         `json:"tool"`
+	Relevant     GameRelevant   `json:"relevant"`
 }
 
 /*#[derive(Debug, Clone, Deserialize, Default, Serialize)]

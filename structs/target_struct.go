@@ -54,6 +54,14 @@ type AllStatsChampionStats struct {
 	MagicPenetrationFlat    float64 `json:"magicPenetrationFlat"`
 }
 
+type TargetChampion struct {
+	Id      string              `json:"id"`
+	Name    string              `json:"name"`
+	Stats   RiotChampionStats   `json:"stats"`
+	Spells  RiotChampionSpell   `json:"spells"`
+	Passive RiotChampionPassive `json:"passive"`
+}
+
 type AllStatsActivePlayer struct {
 	ID            string                `json:"id"`
 	Level         uint8                 `json:"level"`

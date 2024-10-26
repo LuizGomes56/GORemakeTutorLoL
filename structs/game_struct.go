@@ -57,6 +57,7 @@ type GameActivePlayer struct {
 			Id          uint32 `json:"id"`
 		}
 	}
+	ExtendsActivePlayer
 }
 
 type GamePlayer struct {

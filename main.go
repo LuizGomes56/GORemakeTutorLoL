@@ -1,25 +1,13 @@
 package main
 
 import (
-	"encoding/json"
+	"golang/functions"
 	"golang/services"
 	"golang/structs"
-	"log"
-	"os"
 )
 
 func main() {
-	data, err := os.ReadFile("test.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var game structs.GameProps
-
-	err = json.Unmarshal(data, &game)
-	if err != nil {
-		log.Fatal(err)
-	}
+	game := functions.FetchFile[structs.GameProps]("test")
 
 	services.Calculate(game)
 }
