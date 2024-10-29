@@ -1,5 +1,51 @@
 package structs
 
+type GameCoreStats struct {
+	MaxHealth    float64 `json:"maxHealth"`
+	Armor        float64 `json:"armor"`
+	MagicResist  float64 `json:"magicResist"`
+	AttackDamage float64 `json:"attackDamage"`
+	ResourceMax  float64 `json:"resourceMax"`
+	AbilityPower float64 `json:"abilityPower"`
+}
+
+func formula(base float64, per_level float64, level float64) float64 {
+	return base + per_level*(level-1.0)*(0.7025+0.0175*(level-1.0))
+}
+
+func Base(base RiotChampionStats, level float64) GameCoreStats {
+	return GameCoreStats{
+		MaxHealth:    formula(base.Hp, base.Hpperlevel, level),
+		Armor:        formula(base.Armor, base.Armorperlevel, level),
+		MagicResist:  formula(base.Spellblock, base.SpellBlockPerLevel, level),
+		AttackDamage: formula(base.Attackdamage, base.Attackdamageperlevel, level),
+		ResourceMax:  formula(base.Mp, base.Mpperlevel, level),
+		AbilityPower: 0.0,
+	}
+}
+
+func (base GameCoreStats) Bonus(current GameCoreStats) GameCoreStats {
+	return GameCoreStats{
+		MaxHealth:    base.MaxHealth - current.MaxHealth,
+		Armor:        base.Armor - current.Armor,
+		MagicResist:  base.MagicResist - current.MagicResist,
+		AttackDamage: base.AttackDamage - current.AttackDamage,
+		ResourceMax:  base.ResourceMax - current.ResourceMax,
+		AbilityPower: current.AbilityPower,
+	}
+}
+
+// func (base GameCoreStats) Bonus(current ChampionStats) GameCoreStats {
+// 	return GameCoreStats{
+// 		MaxHealth:    base.MaxHealth - current.MaxHealth,
+// 		Armor:        base.Armor - current.Armor,
+// 		MagicResist:  base.MagicResist - current.MagicResist,
+// 		AttackDamage: base.AttackDamage - current.AttackDamage,
+// 		ResourceMax:  base.ResourceMax - current.ResourceMax,
+// 		AbilityPower: current.AbilityPower,
+// 	}
+// }
+
 type ExtendsActivePlayer struct {
 	ChampionName string         `json:"championName"`
 	Champion     TargetChampion `json:"champion"`
@@ -8,19 +54,16 @@ type ExtendsActivePlayer struct {
 	Team         string         `json:"team"`
 	Tool         string         `json:"tool"`
 	Relevant     GameRelevant   `json:"relevant"`
+	Skin         uint8          `json:"skin"`
+	Items        []string       `json:"items"`
 }
 
-/*#[derive(Debug, Clone, Deserialize, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GamePlayerDamage {
-    pub min: f64,
-    pub max: Option<f64>,
-    #[serde(rename = "type")]
-    pub damage_type: String,
-    pub name: Option<String>,
-    pub area: Option<bool>,
-    pub onhit: Option<bool>,
-}*/
+type ExtendsPlayer struct {
+	Champion   TargetChampion `json:"champion,omitempty"`
+	BaseStats  GameCoreStats  `json:"baseStats,omitempty"`
+	BonusStats GameCoreStats  `json:"bonusStats,omitempty"`
+	Damage     ExtendsDamage  `json:"damage,omitempty"`
+}
 
 type ExtendsPlayerDamage map[string]struct {
 	Min   float64 `json:"min"`

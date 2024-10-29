@@ -38,6 +38,22 @@ type ChampionStats struct {
 	ResourceMax             float64 `json:"resourceMax"`
 }
 
+func (curr ChampionStats) Core() GameCoreStats {
+	return GameCoreStats{
+		MaxHealth:    curr.MaxHealth,
+		Armor:        curr.Armor,
+		MagicResist:  curr.MagicResist,
+		AttackDamage: curr.AttackDamage,
+		ResourceMax:  curr.ResourceMax,
+		AbilityPower: curr.AbilityPower,
+	}
+}
+
+type GeneralRunes struct {
+	DisplayName string `json:"displayName"`
+	Id          uint32 `json:"id"`
+}
+
 type GameActivePlayer struct {
 	SummonerName string `json:"summonerName"`
 	Level        int    `json:"level"`
@@ -52,12 +68,19 @@ type GameActivePlayer struct {
 	} `json:"abilities"`
 	ChampionStats ChampionStats `json:"championStats"`
 	FullRunes     struct {
-		GeneralRunes []struct {
-			DisplayName string `json:"displayName"`
-			Id          uint32 `json:"id"`
-		}
-	}
+		GeneralRunes []GeneralRunes `json:"generalRunes"`
+	} `json:"fullRunes"`
 	ExtendsActivePlayer
+}
+
+type SummonerSpell struct {
+	DisplayName    string `json:"displayName"`
+	RawDescription string `json:"rawDescription"`
+}
+
+type SummonerSpells struct {
+	SummonerSpellOne SummonerSpell `json:"summonerSpellOne"`
+	SummonerSpellTwo SummonerSpell `json:"summonerSpellTwo"`
 }
 
 type GamePlayer struct {
@@ -73,27 +96,10 @@ type GamePlayer struct {
 	Items []struct {
 		ItemId uint16 `json:"itemID"`
 	}
-	SummonerSpells struct {
-		SummonerSpellOne struct {
-			DisplayName    string `json:"displayName"`
-			RawDescription string `json:"rawDescription"`
-		}
-		SummonerSpellTwo struct {
-			DisplayName    string `json:"displayName"`
-			RawDescription string `json:"rawDescription"`
-		}
-	}
-	SkinId uint8  `json:"skinID"`
-	Team   string `json:"team"`
-}
-
-type GameCoreStats struct {
-	MaxHealth    float64 `json:"maxHealth"`
-	Armor        float64 `json:"armor"`
-	MagicResist  float64 `json:"magicResist"`
-	AttackDamage float64 `json:"attackDamage"`
-	ResourceMax  float64 `json:"resourceMax"`
-	AbilityPower float64 `json:"abilityPower"`
+	SummonerSpells SummonerSpells `json:"summonerSpells"`
+	SkinId         uint8          `json:"skinID"`
+	Team           string         `json:"team"`
+	ExtendsPlayer
 }
 
 type GameRelevantProps struct {

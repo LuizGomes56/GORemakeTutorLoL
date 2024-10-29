@@ -58,7 +58,7 @@ type TargetChampion struct {
 	Id      string              `json:"id"`
 	Name    string              `json:"name"`
 	Stats   RiotChampionStats   `json:"stats"`
-	Spells  RiotChampionSpell   `json:"spells"`
+	Spells  []RiotChampionSpell `json:"spells"`
 	Passive RiotChampionPassive `json:"passive"`
 }
 
