@@ -9,11 +9,10 @@ type GameCoreStats struct {
 	AbilityPower float64 `json:"abilityPower"`
 }
 
-func formula(base float64, per_level float64, level float64) float64 {
-	return base + per_level*(level-1.0)*(0.7025+0.0175*(level-1.0))
-}
-
 func Base(base RiotChampionStats, level float64) GameCoreStats {
+	formula := func(base float64, per_level float64, level float64) float64 {
+		return base + per_level*(level-1.0)*(0.7025+0.0175*(level-1.0))
+	}
 	return GameCoreStats{
 		MaxHealth:    formula(base.Hp, base.Hpperlevel, level),
 		Armor:        formula(base.Armor, base.Armorperlevel, level),
@@ -26,25 +25,14 @@ func Base(base RiotChampionStats, level float64) GameCoreStats {
 
 func (base GameCoreStats) Bonus(current GameCoreStats) GameCoreStats {
 	return GameCoreStats{
-		MaxHealth:    base.MaxHealth - current.MaxHealth,
-		Armor:        base.Armor - current.Armor,
-		MagicResist:  base.MagicResist - current.MagicResist,
-		AttackDamage: base.AttackDamage - current.AttackDamage,
-		ResourceMax:  base.ResourceMax - current.ResourceMax,
+		MaxHealth:    current.MaxHealth - base.MaxHealth,
+		Armor:        current.Armor - base.Armor,
+		MagicResist:  current.MagicResist - base.MagicResist,
+		AttackDamage: current.AttackDamage - base.AttackDamage,
+		ResourceMax:  current.ResourceMax - base.ResourceMax,
 		AbilityPower: current.AbilityPower,
 	}
 }
-
-// func (base GameCoreStats) Bonus(current ChampionStats) GameCoreStats {
-// 	return GameCoreStats{
-// 		MaxHealth:    base.MaxHealth - current.MaxHealth,
-// 		Armor:        base.Armor - current.Armor,
-// 		MagicResist:  base.MagicResist - current.MagicResist,
-// 		AttackDamage: base.AttackDamage - current.AttackDamage,
-// 		ResourceMax:  base.ResourceMax - current.ResourceMax,
-// 		AbilityPower: current.AbilityPower,
-// 	}
-// }
 
 type ExtendsActivePlayer struct {
 	ChampionName string         `json:"championName"`
@@ -59,10 +47,11 @@ type ExtendsActivePlayer struct {
 }
 
 type ExtendsPlayer struct {
-	Champion   TargetChampion `json:"champion,omitempty"`
-	BaseStats  GameCoreStats  `json:"baseStats,omitempty"`
-	BonusStats GameCoreStats  `json:"bonusStats,omitempty"`
-	Damage     ExtendsDamage  `json:"damage,omitempty"`
+	Champion      TargetChampion `json:"champion,omitempty"`
+	ChampionStats GameCoreStats  `json:"championStats,omitempty"`
+	BaseStats     GameCoreStats  `json:"baseStats,omitempty"`
+	BonusStats    GameCoreStats  `json:"bonusStats,omitempty"`
+	Damage        ExtendsDamage  `json:"damage,omitempty"`
 }
 
 type ExtendsPlayerDamage map[string]struct {

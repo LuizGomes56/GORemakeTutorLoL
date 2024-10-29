@@ -10,6 +10,16 @@ var IDS_CACHE = functions.FetchFile[map[string]map[string]string]("cache/ids")
 var ITEM_CACHE = functions.FetchFile[structs.RiotItems]("cache/item")
 var CHAMPION_CACHE = make(map[string]structs.TargetChampion)
 
+func ItemAPI(name *string) structs.RiotItem {
+	path, exists := ITEM_CACHE.Data[*name]
+
+	if !exists {
+		panic(fmt.Sprintf("ItemAPI -> Item %s not found", *name))
+	}
+
+	return path
+}
+
 func get_champion(name *string) string {
 	for key, val := range IDS_CACHE {
 		for _, v := range val {

@@ -54,18 +54,20 @@ type GeneralRunes struct {
 	Id          uint32 `json:"id"`
 }
 
+type GameAbilities struct {
+	Passive struct {
+		DisplayName string `json:"displayName"`
+		Id          string `json:"id"`
+	}
+	Q, W, E, R struct {
+		AbilityLevel uint8 `json:"abilityLevel"`
+	}
+}
+
 type GameActivePlayer struct {
-	SummonerName string `json:"summonerName"`
-	Level        int    `json:"level"`
-	Abilities    struct {
-		Passive struct {
-			DisplayName string `json:"displayName"`
-			Id          string `json:"id"`
-		}
-		Q, W, E, R struct {
-			AbilityLevel uint8 `json:"abilityLevel"`
-		}
-	} `json:"abilities"`
+	SummonerName  string        `json:"summonerName"`
+	Level         int           `json:"level"`
+	Abilities     GameAbilities `json:"abilities"`
 	ChampionStats ChampionStats `json:"championStats"`
 	FullRunes     struct {
 		GeneralRunes []GeneralRunes `json:"generalRunes"`
