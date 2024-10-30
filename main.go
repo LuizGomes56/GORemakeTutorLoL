@@ -12,7 +12,9 @@ func main() {
 	start := time.Now()
 	game := functions.FetchFile[structs.GameProps]("test")
 
-	services.Calculate(&game)
+	/*res := */
+	services.Calculate(&game, "4645")
+	// functions.ToStringPretty(res)
 
 	elapsed := time.Since(start)
 	fmt.Printf("It took %s", elapsed)

@@ -4,13 +4,18 @@ import (
 	"fmt"
 	"golang/functions"
 	"golang/structs"
+	"log"
 	"math"
+	"strconv"
 	"strings"
+
+	"github.com/Knetic/govaluate"
 )
 
 var LOCAL_CHAMPION structs.LocalChampion
 var LOCAL_ITEMS = functions.FetchFile[structs.LocalItems]("effects/items")
 var LOCAL_RUNES = functions.FetchFile[structs.LocalRunes]("effects/runes")
+var LOCAL_STATS = functions.FetchFile[structs.LocalStats]("cache/stats")
 
 func assign_champion(allPlayers []structs.GamePlayer) {
 	for i := range allPlayers {
@@ -20,7 +25,7 @@ func assign_champion(allPlayers []structs.GamePlayer) {
 	}
 }
 
-func Calculate(data *structs.GameProps) {
+func Calculate(data *structs.GameProps, tool_item string) structs.GameProps {
 	assign_champion(data.AllPlayers)
 
 	for _, player := range data.AllPlayers {
@@ -52,11 +57,28 @@ func Calculate(data *structs.GameProps) {
 					Spell:     filter_spells(player.SummonerSpells),
 				}
 			}
+
+			{
+				path, exists := LOCAL_STATS[tool_item]
+				if !exists {
+					log.Fatal("Error at func Calculate() on tool_item; LOCAL_STATS: " + tool_item)
+				}
+				_, active := LOCAL_ITEMS[tool_item]
+
+				data.ActivePlayer.Tool = structs.GameToolInfo{
+					Id:     tool_item,
+					Name:   path.Name,
+					Active: active,
+					Gold:   uint16(path.Gold.Total),
+					Raw:    path.Stats.Raw,
+				}
+			}
 			break
 		}
 	}
 
-	for i, player := range data.AllPlayers {
+	for i := range data.AllPlayers {
+		player := &data.AllPlayers[i]
 		if player.Team != data.ActivePlayer.Team {
 			base := structs.Base(player.Champion.Stats, float64(player.Level))
 
@@ -73,27 +95,391 @@ func Calculate(data *structs.GameProps) {
 			player.ChampionStats = champion_stats
 			player.BonusStats = base.Bonus(champion_stats)
 
-			stats := all_stats(player, data.ActivePlayer)
+			stats := all_stats(*player, data.ActivePlayer)
 
-			// relv := data.ActivePlayer.Relevant
+			relv := data.ActivePlayer.Relevant
 
-			// player.Damage = structs.ExtendsDamage{
-			// 	Abilities: ability_damage(stats, data.ActivePlayer.Abilities),
-			// 	Runes:     rune_damage(stats, relv.Runes.Min),
-			// 	Items:     item_damage(stats, relv.Items.Min),
-			// 	Spell:     spell_damage(player.Level, relv.Spell.Min),
-			// }
+			player.Damage = structs.ExtendsDamage{
+				Abilities: ability_damage(stats, data.ActivePlayer.Abilities),
+				Runes:     rune_damage(stats, relv.Runes.Min),
+				Items:     item_damage(stats, relv.Items.Min),
+				Spell:     spell_damage(player.Level, relv.Spell.Min),
+			}
 
-			if i == 0 {
-				fmt.Printf("%+v\n", stats)
+			cloned, err := functions.StructuredClone(data.ActivePlayer)
+			if err != nil {
+				log.Fatal("Erro ao clonar os dados de ActivePlayer: ", err)
+			}
+			player.Tool = tool_damage(cloned, *player, tool_item)
+		}
+	}
+
+	return *data
+}
+
+func assign_stats(item string, active_player *structs.GameActivePlayer) map[string]float64 {
+	stats := active_player.ChampionStats.IntoHashMap()
+
+	if res, ok := LOCAL_STATS[item]; ok {
+		for key, val := range res.Stats.Mod {
+			if _, ok := stats[key]; ok {
+				if v, ok := val.(float64); ok {
+					stats[key] += v
+				} else if v, ok := val.(string); ok {
+					v = strings.ReplaceAll(v, "%", "")
+					if r, err := strconv.ParseFloat(v, 64); err == nil {
+						stats[key] -= r
+					}
+				}
 			}
 		}
 	}
-	// fmt.Printf("%+v\n", data.AllPlayers[0])
+	return stats
 }
 
-func ability_damage(stats structs.TargetAllStats, abilities structs.GameAbilities) {
+func evaluate_change(next structs.ExtendsPlayerDamage, curr structs.ExtendsPlayerDamage) structs.ExtendsPlayerDamage {
+	var max float64
+	if next.Max != nil && curr.Max != nil {
+		max = *next.Max - *curr.Max
+	}
 
+	return structs.ExtendsPlayerDamage{
+		Min:   next.Min - curr.Min,
+		Max:   &max,
+		Type:  next.Type,
+		Name:  next.Name,
+		Area:  next.Area,
+		Onhit: next.Onhit,
+	}
+}
+
+func process_change(at string, val structs.ExtendsDamageReturn, min_at structs.ExtendsDamageReturn, change_at *structs.ExtendsDamageReturn, sum *float64) {
+	for k, v := range val {
+		if curr, ok := min_at[k]; ok {
+			result := evaluate_change(v, curr)
+			*sum += result.Min
+			if result.Max != nil {
+				*sum += *result.Max
+			}
+			(*change_at)[k] = result
+		} else {
+			fmt.Printf("Key is %s, and was not found in both directions on %s\n", k, at)
+			continue
+		}
+	}
+}
+
+func find_change(max structs.ExtendsDamage, min structs.ExtendsDamage, sum *float64) *structs.ExtendsDamage {
+	change := structs.ExtendsDamage{
+		Abilities: structs.ExtendsDamageReturn{},
+		Runes:     structs.ExtendsDamageReturn{},
+		Items:     structs.ExtendsDamageReturn{},
+		Spell:     structs.ExtendsDamageReturn{},
+	}
+	min_hashmap := min.ToHashMap()
+	max_hashmap := max.ToHashMap()
+
+	for key, val := range max_hashmap {
+		switch key {
+		case "abilities":
+			process_change(key, val, min_hashmap[key], &change.Abilities, sum)
+		case "runes":
+			process_change(key, val, min_hashmap[key], &change.Runes, sum)
+		case "items":
+			process_change(key, val, min_hashmap[key], &change.Items, sum)
+		case "spell":
+			process_change(key, val, min_hashmap[key], &change.Spell, sum)
+		}
+	}
+
+	return &change
+}
+
+func tool_change(max structs.ExtendsDamage, min structs.ExtendsDamage) structs.ExtendsToolChange {
+	sum := 0.0
+	dif := find_change(max, min, &sum)
+	return structs.ExtendsToolChange{
+		Dif: dif,
+		Sum: sum,
+	}
+}
+
+func tool_damage(active_player structs.GameActivePlayer, player structs.GamePlayer, item string) structs.ExtendsTool {
+	assigned_stats := assign_stats(item, &active_player)
+
+	current_stats := structs.FromHashMapCamel(assigned_stats)
+
+	active_player.ChampionStats = current_stats
+	active_player.BonusStats = active_player.BaseStats.Bonus(active_player.ChampionStats.Core())
+
+	stats := all_stats(player, active_player)
+
+	max := structs.ExtendsDamage{
+		Abilities: ability_damage(stats, active_player.Abilities),
+		Runes:     rune_damage(stats, active_player.Relevant.Runes.Min),
+		Items:     item_damage(stats, active_player.Relevant.Items.Min),
+		Spell:     spell_damage(player.Level, active_player.Relevant.Spell.Min),
+	}
+
+	change := tool_change(max, player.Damage)
+
+	result := structs.ExtendsTool{
+		Sum: change.Sum,
+		Dif: change.Dif,
+		Max: max,
+	}
+	return result
+}
+
+func rune_damage(stats structs.TargetAllStats, runes []string) map[string]structs.ExtendsPlayerDamage {
+	result := make(map[string]structs.ExtendsPlayerDamage, 8)
+	form := stats.ActivePlayer.Form
+	for _, r := range runes {
+		element, exists := LOCAL_RUNES[r]
+		if !exists {
+			continue
+		}
+		var min_str string
+		switch form {
+		case "melee":
+			min_str = element.Min.Melee
+		case "ranged":
+			min_str = element.Min.Ranged
+		default:
+			log.Fatal("Error at func rune_damage() on rune: Form is not defined." + r)
+		}
+		min, _ := evaluate(min_str, nil, stats, nil)
+
+		result[r] = structs.ExtendsPlayerDamage{
+			Min:  min,
+			Type: element.Type,
+			Name: &element.Name,
+		}
+	}
+	return result
+}
+
+func item_damage(stats structs.TargetAllStats, items []string) map[string]structs.ExtendsPlayerDamage {
+	result := make(map[string]structs.ExtendsPlayerDamage, 8)
+	form := stats.ActivePlayer.Form
+	for _, r := range items {
+		element, exists := LOCAL_ITEMS[r]
+		if !exists {
+			continue
+		}
+		var min_str string
+		var max_str *string
+		var total *float64
+		if element.Effect != nil {
+			total = &element.Effect[stats.ActivePlayer.Level-1]
+		}
+		switch form {
+		case "melee":
+			min_str = element.Min.Melee
+		case "ranged":
+			min_str = element.Min.Ranged
+		default:
+			log.Fatal("Error at func rune_damage() on rune: Form is not defined." + r)
+		}
+		extras := make(map[string]float64, 1)
+		if total != nil {
+			extras["total"] = *total
+		}
+		min, max := evaluate(min_str, max_str, stats, &extras)
+		result[r] = structs.ExtendsPlayerDamage{
+			Min:   min,
+			Max:   max,
+			Type:  element.Type,
+			Name:  &element.Name,
+			Onhit: &element.Onhit,
+		}
+	}
+	return result
+}
+
+func spell_damage(level uint8, spells []string) map[string]structs.ExtendsPlayerDamage {
+	result := make(map[string]structs.ExtendsPlayerDamage, 1)
+	for _, spell := range spells {
+		if spell == "SummonerDot" {
+			name := "Ignite"
+			result[spell] = structs.ExtendsPlayerDamage{
+				Min:  50.0 + 20.0*float64(level),
+				Type: "true",
+				Name: &name,
+			}
+		}
+	}
+	return result
+}
+
+func json_replacements(stats structs.TargetAllStats) structs.TargetReplacements {
+	x := stats.ActivePlayer
+	y := stats.Player
+	z := stats.Property
+	k := x.ChampionStats
+	t := x.BaseStats
+	n := x.BonusStats
+	m := y.ChampionStats
+
+	type Entry struct {
+		Key   string
+		Value float64
+	}
+
+	entries := []Entry{
+		{"steelcapsEffect", z.Steelcaps},
+		{"attackReductionEffect", z.Rocksolid},
+		{"exceededHP", z.ExcessHealth},
+		{"missingHP", z.MissingHealth},
+		{"magicMod", x.Multiplier.Magic},
+		{"physicalMod", x.Multiplier.Physical},
+		{"level", float64(x.Level)},
+		{"currentAP", k.AbilityPower},
+		{"currentAD", k.AttackDamage},
+		{"currentLethality", k.PhysicalLethality},
+		{"maxHP", k.MaxHealth},
+		{"maxMana", k.ResourceMax},
+		{"currentMR", k.MagicResist},
+		{"currentArmor", k.Armor},
+		{"currentHealth", k.CurrentHealth},
+		{"basicAttack", 1.0},
+		{"attackSpeed", 1.0},
+		{"critChance", k.CritChance},
+		{"critDamage", k.CritDamage},
+		{"adaptative", x.Adaptative.Ratio},
+		{"baseHP", t.MaxHealth},
+		{"baseMana", t.ResourceMax},
+		{"baseArmor", t.Armor},
+		{"baseMR", t.MagicResist},
+		{"baseAD", t.AttackDamage},
+		{"bonusAD", n.AttackDamage},
+		{"bonusHP", n.MaxHealth},
+		{"bonusArmor", n.Armor},
+		{"bonusMR", n.MagicResist},
+		{"expectedHealth", m.MaxHealth},
+		{"expectedMana", m.ResourceMax},
+		{"expectedArmor", m.Armor},
+		{"expectedMR", m.MagicResist},
+		{"expectedAD", m.AttackDamage},
+		{"expectedBonusHealth", y.BonusStats.MaxHealth},
+	}
+
+	result := make(map[string]float64, len(entries)+1)
+	for _, entry := range entries {
+		result[entry.Key] = entry.Value
+	}
+	return result
+}
+
+func evaluate(min_str string, max_str *string, stats structs.TargetAllStats, extra *map[string]float64) (float64, *float64) {
+	replacemets := json_replacements(stats)
+
+	if extra != nil {
+		for key, val := range *extra {
+			replacemets[key] = val
+		}
+	}
+
+	for key, val := range replacemets {
+		min_str = strings.ReplaceAll(min_str, key, fmt.Sprintf("%f", val))
+		if max_str == nil {
+			continue
+		}
+		*max_str = strings.ReplaceAll(*max_str, key, fmt.Sprintf("%f", val))
+	}
+
+	min_expr, err := govaluate.NewEvaluableExpression(min_str)
+	if err != nil {
+		log.Fatal("Error at func evaluate() on min_expr: " + err.Error())
+	}
+	min_eval, err := min_expr.Evaluate(nil)
+	if err != nil {
+		log.Fatal("Error at func evaluate() on min: " + err.Error())
+	}
+
+	min, ok := min_eval.(float64)
+	if !ok {
+		log.Fatal("Error at func evaluate() on min: expected float64")
+	}
+
+	if max_str == nil {
+		return min, nil
+	}
+
+	max_expr, err := govaluate.NewEvaluableExpression(*max_str)
+	if err != nil {
+		log.Fatal("Error at func evaluate() on max_expr: " + err.Error())
+	}
+	max_eval, err := max_expr.Evaluate(nil)
+	if err != nil {
+		log.Fatal("Error at func evaluate() on max: " + err.Error())
+	}
+
+	max, ok := max_eval.(float64)
+	if !ok {
+		log.Fatal("Error at func evaluate() on max: expected float64")
+	}
+
+	return min, &max
+}
+
+func ability_damage(stats structs.TargetAllStats, abilities structs.GameAbilities) map[string]structs.ExtendsPlayerDamage {
+	res := make(map[string]structs.ExtendsPlayerDamage, 8)
+	for key, val := range LOCAL_CHAMPION {
+		letter := key[0]
+		var index uint8
+		switch letter {
+		case 'Q':
+			index = abilities.Q.AbilityLevel - 1
+		case 'W':
+			index = abilities.W.AbilityLevel - 1
+		case 'E':
+			index = abilities.E.AbilityLevel - 1
+		case 'R':
+			index = abilities.R.AbilityLevel - 1
+		case 'P':
+			index = stats.ActivePlayer.Level - 1
+		default:
+			log.Fatal("Error at func ability_damage() on key: " + key)
+		}
+		if index == 0 {
+			continue
+		}
+
+		var min_str string
+		var max_str *string
+
+		if int(index) < len(val.Min) {
+			min_str = val.Min[index]
+		}
+
+		if int(index) < len(val.Max) {
+			max_str = &val.Max[index]
+		}
+
+		min, max := evaluate(min_str, max_str, stats, nil)
+
+		res[key] = structs.ExtendsPlayerDamage{
+			Min:  min,
+			Max:  max,
+			Type: val.Type,
+			Area: &val.Area,
+		}
+	}
+
+	acst := stats.ActivePlayer.ChampionStats
+	attack := acst.AttackDamage * stats.ActivePlayer.Multiplier.Physical
+	res["A"] = structs.ExtendsPlayerDamage{
+		Min:  attack,
+		Max:  nil,
+		Type: "physical",
+	}
+	res["C"] = structs.ExtendsPlayerDamage{
+		Min:  attack * acst.CritDamage / 100.0,
+		Max:  nil,
+		Type: "physical",
+	}
+	return res
 }
 
 func all_stats(player structs.GamePlayer, activePlayer structs.GameActivePlayer) structs.TargetAllStats {

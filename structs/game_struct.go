@@ -49,6 +49,46 @@ func (curr ChampionStats) Core() GameCoreStats {
 	}
 }
 
+func (key ChampionStats) IntoHashMap() map[string]float64 {
+	return map[string]float64{
+		"abilityPower":            key.AbilityPower,
+		"armor":                   key.Armor,
+		"armorPenetrationFlat":    key.ArmorPenetrationFlat,
+		"armorPenetrationPercent": key.ArmorPenetrationPercent,
+		"attackDamage":            key.AttackDamage,
+		"attackRange":             key.AttackRange,
+		"critChance":              key.CritChance,
+		"critDamage":              key.CritDamage,
+		"currentHealth":           key.CurrentHealth,
+		"magicPenetrationFlat":    key.MagicPenetrationFlat,
+		"magicPenetrationPercent": key.MagicPenetrationPercent,
+		"magicResist":             key.MagicResist,
+		"maxHealth":               key.MaxHealth,
+		"physicalLethality":       key.PhysicalLethality,
+		"resourceMax":             key.ResourceMax,
+	}
+}
+
+func FromHashMapCamel(stats map[string]float64) ChampionStats {
+	return ChampionStats{
+		AbilityPower:            stats["abilityPower"],
+		Armor:                   stats["armor"],
+		ArmorPenetrationFlat:    stats["armorPenetrationFlat"],
+		ArmorPenetrationPercent: stats["armorPenetrationPercent"],
+		AttackDamage:            stats["attackDamage"],
+		AttackRange:             stats["attackRange"],
+		CritChance:              stats["critChance"],
+		CritDamage:              stats["critDamage"],
+		CurrentHealth:           stats["currentHealth"],
+		MagicPenetrationFlat:    stats["magicPenetrationFlat"],
+		MagicPenetrationPercent: stats["magicPenetrationPercent"],
+		MagicResist:             stats["magicResist"],
+		MaxHealth:               stats["maxHealth"],
+		PhysicalLethality:       stats["physicalLethality"],
+		ResourceMax:             stats["resourceMax"],
+	}
+}
+
 type GeneralRunes struct {
 	DisplayName string `json:"displayName"`
 	Id          uint32 `json:"id"`
@@ -102,24 +142,4 @@ type GamePlayer struct {
 	SkinId         uint8          `json:"skinID"`
 	Team           string         `json:"team"`
 	ExtendsPlayer
-}
-
-type GameRelevantProps struct {
-	Min []string `json:"min"`
-	Max []string `json:"max"`
-}
-
-type GameRelevant struct {
-	Abilities GameRelevantProps `json:"abilities"`
-	Items     GameRelevantProps `json:"items"`
-	Runes     GameRelevantProps `json:"runes"`
-	Spell     GameRelevantProps `json:"spells"`
-}
-
-type GameToolInfo struct {
-	Id     string         `json:"id"`
-	Name   string         `json:"name"`
-	Active bool           `json:"active"`
-	Gold   uint16         `json:"gold"`
-	Raw    map[string]any `json:"raw"`
 }
