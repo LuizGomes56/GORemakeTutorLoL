@@ -63,7 +63,7 @@ type GameRelevant struct {
 	Abilities GameRelevantProps `json:"abilities"`
 	Items     GameRelevantProps `json:"items"`
 	Runes     GameRelevantProps `json:"runes"`
-	Spell     GameRelevantProps `json:"spells"`
+	Spell     GameRelevantProps `json:"spell"`
 }
 
 type ExtendsPlayer struct {

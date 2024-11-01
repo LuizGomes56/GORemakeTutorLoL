@@ -4,12 +4,10 @@ type GameProps struct {
 	ActivePlayer GameActivePlayer `json:"activePlayer"`
 	AllPlayers   []GamePlayer     `json:"allPlayers"`
 	Events       GameEvents       `json:"events"`
-	GameData     GameData         `json:"gameData"`
-}
-
-type GameData struct {
-	GameTime  float64 `json:"gameTime"`
-	MapNumber uint8   `json:"mapNumber"`
+	GameData     struct {
+		GameTime  float64 `json:"gameTime"`
+		MapNumber uint8   `json:"mapNumber"`
+	} `json:"gameData"`
 }
 
 type GameEvents struct {

@@ -44,7 +44,7 @@ type RiotChampionData struct {
 		Num uint8 `json:"num"`
 	}
 	Stats   RiotChampionStats   `json:"stats"`
-	Spells  []RiotChampionSpell `json:"spell"`
+	Spells  []RiotChampionSpell `json:"spells"`
 	Passive RiotChampionPassive `json:"passive"`
 }
 

@@ -30,6 +30,7 @@ func Calculate(data *structs.GameProps, tool_item string) structs.GameProps {
 
 	for _, player := range data.AllPlayers {
 		if player.SummonerName == data.ActivePlayer.SummonerName {
+			data.ActivePlayer.Team = player.Team
 			data.ActivePlayer.Champion = player.Champion
 			data.ActivePlayer.ChampionName = player.ChampionName
 			data.ActivePlayer.Skin = player.SkinId
